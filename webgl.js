@@ -131,10 +131,8 @@ function CreateGeometryUI()
     const h = eh ? eh.value : 1.0;
 
     document.getElementById('ui').innerHTML =
-    'Width: <input type="number" id="w" value="" + w +'
-    onchange= "InitShaders();"> + 
-    'Height: <input type="number" id="h" value="" + h +'
-    onchange= "InitShaders();"
+    'Width: <input type="number" id="w" value="' + w + '" onchange="InitShaders();"><br>' +
+    'Height: <input type="number" id="h" value="' + h + '" onchange="InitShaders();">';
 
     let e = document.getElementById('shape');
     switch (e.selectedIndex)
@@ -182,10 +180,10 @@ function CreateQuad(width, height) // funktion der generer koordinater baseret p
     vertices.length = 0;
     const w = width * 0.5;
     const h = height * 0.5;
-    AddQuad(0.0,  h, 0.0, 1.0, 0.0, 0.0,
+    AddQuad (-w,  h, 0.0, 1.0, 0.0, 0.0,
              -w, -h, 0.0, 0.0, 1.0, 0.0,
               w, -h, 0.0, 0.0, 0.0, 1.0,
-              w, h, 0.0, 1.0, 1.0, 0.0)
+              w,  h, 0.0, 1.0, 1.0, 0.0)
 }
 
 function CreateGeometryBuffers(program)
