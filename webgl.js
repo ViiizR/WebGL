@@ -1,9 +1,26 @@
-var vertices = [];
-
 var gl = document.getElementById('gl')
          .getContext('webgl') || 
          document.getElementById('gl')
          .getContext('experimental-webgl');
+
+var vertices = [];
+var mouseX = 0; var mouseY = 0;
+var angle = [0.0, 0.0, 0.0, 1.0];
+var angleGL = 0;
+
+document.getElementById('gl').addEventListener('mousemove', function (e)
+{
+    if (e.buttons == 1)
+    {
+        // Left mouse button pressed
+        angle[0] -= (mouseY - e.y) * 0.01;
+        angle[1] += (mouseX - e.x) * 0.01;
+        gl.uniform4fv(angleGL, new Float32Array(angle));
+        Render();
+    }
+    mouseX = e.x;
+    mouseY = e.y;
+});
 
 function InitWebGL()
 {
@@ -191,6 +208,8 @@ function CreateGeometryBuffers(program)
     CreateGeometryUI();
 
     CreateVBO(program, new Float32Array(vertices))
+
+    angleGL = gl.getUniformLocation(program, 'Angle');
 
     gl.useProgram(program);
 
