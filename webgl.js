@@ -11,6 +11,17 @@ var angleGL = 0;
 var textureGL = 0; // Uniform Location
 var display = [0.0, 0.0, 0.0, 0.0];
 var displayGL = 0; // Uniform Location
+var proGL = 0; // Uniform Location
+var projection = [ 0.0, 0.0, 0.0, 0.0,
+                   0.0, 0.0, 0.0, 0.0,
+                   0.0, 0.0, 0.0, 0.0,
+                   0.0, 0.0, 0.0, 0.0 ];
+var modGL = 0; // Uniform location
+// Model View Matrix
+var modelView = [ 1.0, 0.0,  0.0, 0.0,
+                  0.0, 1.0,  0.0, 0.0,
+                  0.0, 0.0,  1.0, 0.0,
+                  0.0, 0.0, -1.2, 1.0 ];
 
 
 document.getElementById('gl').addEventListener('mousemove', function (e)
@@ -52,7 +63,7 @@ function InitViewport()
 
     gl.clearColor(0.0, 0.4, 0.6, 1.0);
     gl.enable(gl.DEPTH_TEST);
-    gl.enable(gl.CULL_FACE);
+    gl.disable(gl.CULL_FACE);
     gl.enable(gl.BACK);
 
     InitShaders();
@@ -173,7 +184,8 @@ function CreateGeometryUI()
         case 0: CreateTrinangle(w, h); break;
         case 1: CreateQuad(w, h); break;
         case 2: CreateCube(w, h, d); break;
-        case 3: CreateSubdividedCube(w, h, d, s); break;
+        case 3: CreateCylinder(w, h, d, s); break;
+        case 4: CreateSubdividedCube(w, h, d, s); break;
     }
 }
 
@@ -270,6 +282,46 @@ function CreateCube(width, height, depth)
              w,  h, -d, 0.0, 0.0, 0.0, 1.0, 0.0, 
              w, -h, -d, 0.0, 0.0, 1.0, 1.0, 1.0, 
              0.0, 0.0, 1.0,);
+}
+
+function CreateCylinder(width, height, depth, subdivisions)
+{
+    vertices.length = 0;
+    const r = width * 0.5; // Radius
+    const h = height * 0.5; // Half the height
+    const s = Math.max(3, Math.floor(Number(subdivisions)));
+
+    for (let i = 0; i < s; i++)
+    {
+        const a0 = (i / s) * Math.PI * 2;
+        const a1 = ((i +1) / s) * Math.PI * 2;
+
+        const x0 = Math.cos(a0) * r;
+        const z0 = Math.sin(a0) * r;
+        const x1 = Math.cos(a1) * r;
+        const z1 = Math.sin(a1) * r;
+
+        // SIDE
+        AddQuad(x0, h,  z0, 1.0, 0.0, 0.0, i/s,     1.0,
+                x1, h,  z1, 0.0, 1.0, 0.0, (i+1)/s, 1.0,
+                x1, -h, z1, 1.0, 0.0, 0.0, (i+1)/s, 0.0,
+                x0, -h, z0, 1.0, 0.0, 0.0, i/s,     0.0,
+                0.0, 0.0, 1.0);
+
+        // TOP
+        AddTriangle(
+            0.0, h, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5,
+            x1,  h, z1, 0.0, 1.0, 0.0, (Math.cos(a1)+1)*0.5, (Math.sin(a1)+1)*0.5,
+            x0,  h, z0, 0.0, 1.0, 0.0, (Math.cos(a0)+1)*0.5, (Math.sin(a0)+1)*0.5,
+            0.0, 1.0, 0.0);
+
+        // Bottom
+        AddTriangle(
+            0.0, -h, 0.0, 0.0, 0.0, 1.0, 0.5, 0.5,
+            x0,  -h, z0,  0.0, 0.0, 1.0, (Math.cos(a0)+1)*0.5, (Math.sin(a0)+1)*0.5,
+            x1,  -h, z1,  0.0, 0.0, 1.0, (Math.cos(a1)+1)*0.5, (Math.sin(a1)+1)*0.5,
+            0.0, -1.0, 0.0);
+    }
 }
 
 function CreateSubdividedCube(width, height, depth, subdivisions)
@@ -422,14 +474,31 @@ function CreateSubdividedCube(width, height, depth, subdivisions)
 
 }
 
+function Perspective(fovy, aspect, near, far, matrix)
+{
+    // Fill array with zeros
+    matrix.fill(0);
+    // Focal length
+    const f = Math.tan(fovy * Math.PI / 360.0);
+    // Setup matrix
+    matrix[0] = f / aspect;
+    matrix[5] = f;
+    matrix[10] = (far + near)     / (near - far);
+    matrix[11] = (2 * far * near) / (near - far);
+    matrix[14] = -1;
+    gl.uniformMatrix4fv(proGL, false, new Float32Array(projection));
+    gl.uniformMatrix4fv(modGL, false, new Float32Array(modelView));
+}
+
 function CreateGeometryBuffers(program)
 {
     // Generate selected geometry and UI
     CreateGeometryUI();
-
     // Create GPU buffer (VBO)
     CreateVBO(program, new Float32Array(vertices));
     angleGL = gl.getUniformLocation(program, 'Angle');
+    proGL = gl.getUniformLocation(program, 'Projection');
+    modGL = gl.getUniformLocation(program, 'ModelView');
     CreateTexture(program, 'img/texture.jpg');
     // Activate shader program
     gl.useProgram(program);
@@ -477,6 +546,14 @@ function Render()
 {
     gl.clearColor(0.0, 0.4, 0.6, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // Dolly Zoom
+    const zoom = document.getElementById('zoom').value;
+    modelView[14] = -zoom;
+    // Perspective Projection
+    const fov = document.getElementById('fov').value;
+    const aspect = gl.canvas.width / gl.canvas.height;
+    Perspective(fov, aspect, 1.0, 2000.0, projection);
+    // Draw Geometry
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 11);
 }
 

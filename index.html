@@ -17,6 +17,8 @@
         attribute vec2 UV;
         attribute vec3 Normal;
         uniform vec4 Angle;
+        uniform mat4 Projection;
+        uniform mat4 ModelView;
         varying vec3 vertexColor;
         varying vec2 uv;
         varying vec3 normal;
@@ -34,7 +36,7 @@
                              vec4(0.0, 1.0, 0.0, 0.0),
                              vec4(siY, 0.0, coY, 0.0),
                              vec4(0.0, 0.0, 0.0, 1.0));       
-            gl_Position = matX * matY * vec4(Pos, 1.0);
+            gl_Position = Projection * ModelView * matX * matY * vec4(Pos, 1.0);
             vertexColor = Color;
             uv = UV;
             normal = mat3(matX * matY) * Normal;
@@ -65,10 +67,13 @@
         <option selected>Triangle</option>
         <option>Quad</option>
         <option>Cube</option>
+        <option>Cylinder</option>
         <option>SubdividedCube</option>
     </select>
 
     <input type="checkbox" id="t" onchange="Update();">
+    <input type ="number" id="fov" value="90" onchange="Render();"> FOV<br>
+    <input type ="number" id="zoom" value="1.2" onchange="Render();"> Zoom<br>
     Show texture<input type="color" id="l" value="#f6b73c" onchange="Update();">Light color<br>
     <div id="ui">Generate UI for Geometry here!</div>
 
