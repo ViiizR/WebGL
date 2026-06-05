@@ -204,7 +204,7 @@ function AddQuad(x1, y1, z1, r1, g1, b1, u1, v1,
                 nx, ny, nz);
 }
 
-function CreateTrinangle(width, height) // funktion der generer koordinater baseret på dimensioner
+function CreateTrinangle(width, height) 
 {
     vertices.length = 0;
     const w = width * 0.5;
@@ -215,7 +215,7 @@ function CreateTrinangle(width, height) // funktion der generer koordinater base
                 0.0, 0.0, 1.0);
 }
 
-function CreateQuad(width, height) // funktion der generer koordinater baseret på dimensioner
+function CreateQuad(width, height)
 {
     vertices.length = 0;
     const w = width * 0.5;
