@@ -26,6 +26,13 @@
         {
             float coX = cos(Angle.x);
             float siX = sin(Angle.x);
+            float coZ = cos(Pos.y + 0.5);
+            float siZ = sin(Pos.y + 0.5);
+            mat4 bend = mat4(vec4( coZ, siZ, 0.0, 0.0),
+                             vec4(-siZ, coX, 0.0, 0.0),
+                             vec4( 0.0, 0.0, 1.0, 0.0),
+                             vec4( 0.0, 0.0, 0.0, 1.0));
+            vec4 v = bend * vec4(Pos, 1.0);
             mat4 matX = mat4(vec4(1.0, 0.0, 0.0, 0.0),
                              vec4(0.0, coX, siX, 0.0),
                              vec4(0.0, -siX, coX, 0.0),
@@ -36,7 +43,7 @@
                              vec4(0.0, 1.0, 0.0, 0.0),
                              vec4(siY, 0.0, coY, 0.0),
                              vec4(0.0, 0.0, 0.0, 1.0));       
-            gl_Position = Projection * ModelView * matX * matY * vec4(Pos, 1.0);
+            gl_Position = Projection * ModelView * matX * matY * v; //vec4(Pos, 1.0);
             vertexColor = Color;
             uv = UV;
             normal = mat3(matX * matY) * Normal;
@@ -71,7 +78,7 @@
         <option>SubdividedCube</option>
     </select>
 
-    <input type="checkbox" id="t" onchange="Update();">
+    <input type="checkbox" id="t" onchange="Update();"> Texture<br>
     <input type ="number" id="fov" value="90" onchange="Render();"> FOV<br>
     <input type ="number" id="zoom" value="1.2" onchange="Render();"> Zoom<br>
     Show texture<input type="color" id="l" value="#f6b73c" onchange="Update();">Light color<br>
