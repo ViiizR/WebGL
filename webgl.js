@@ -83,6 +83,101 @@ function InitShaders()
     return CreateGeometryBuffers(program);
 }
 
+function CreateGeometryBuffers(program)
+{
+    // Generate selected geometry and UI
+    CreateGeometryUI();
+    // Create GPU buffer (VBO)
+    CreateVBO(program, new Float32Array(vertices));
+    angleGL = gl.getUniformLocation(program, 'Angle');
+    proGL = gl.getUniformLocation(program, 'Projection');
+    modGL = gl.getUniformLocation(program, 'ModelView');
+    CreateTexture(program, 'img/texture.jpg');
+    // Activate shader program
+    gl.useProgram(program);
+    // Update view rotation
+    gl.uniform4fv(angleGL, new Float32Array(angle));
+    // Update display options
+    gl.uniform4fv(displayGL, new Float32Array(display));
+    // Display geometry on screen
+    Render();
+} 
+
+function Render()
+{
+    gl.clearColor(0.0, 0.4, 0.6, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // Dolly Zoom
+    const zoom = document.getElementById('zoom').value;
+    modelView[14] = -zoom;
+    // Perspective Projection
+    const fov = document.getElementById('fov').value;
+    const aspect = gl.canvas.width / gl.canvas.height;
+    Perspective(fov, aspect, 1.0, 2000.0, projection);
+    // Draw Geometry
+    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 11);
+}
+
+function CreateGeometryUI()
+{
+    const ew = document.getElementById('w');
+    const w = ew ? ew.value : 1.0;
+    const eh = document.getElementById('h');
+    const h = eh ? eh.value : 1.0;
+    const ed = document.getElementById('d');
+    const d = ed ? ed.value : 1.0;
+    const es = document.getElementById('s');
+    const s = es ? es.value : 1.0;
+
+    document.getElementById('ui').innerHTML =
+    'Width: <input type="number" id="w" value="' + w + '" onchange="InitShaders();"><br>' +
+    'Height: <input type="number" id="h" value="' + h + '" onchange="InitShaders();"><br>' +
+    'Depth: <input type="number" id="d" value="' + d + '" onchange="InitShaders();"><br>' +
+    'Subdivisions: <input type="number" id="s" value="' + s + '" onchange="InitShaders();">';
+
+    let e = document.getElementById('shape');
+    switch (e.selectedIndex)
+    {
+        case 0: CreateTrinangle(w, h); break;
+        case 1: CreateQuad(w, h); break;
+        case 2: CreateCube(w, h, d); break;
+        case 3: CreateCylinder(w, h, d, s); break;
+        case 4: CreateSubdividedCube(w, h, d, s); break;
+    }
+}
+
+function CreateVBO(program, vert)
+{
+    let vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, vert, gl.DYNAMIC_DRAW);
+
+    const s = 11 * Float32Array.BYTES_PER_ELEMENT;
+
+    // Create shader attribute: Pos
+    let p = gl.getAttribLocation(program, 'Pos');
+    gl.vertexAttribPointer(p, 3, gl.FLOAT, gl.FALSE, s, 0);
+    gl.enableVertexAttribArray(p);
+
+    // Create shader attribute: Color
+    const o = 3 * Float32Array.BYTES_PER_ELEMENT;
+    let c = gl.getAttribLocation(program, 'Color');
+    gl.vertexAttribPointer(c, 3, gl.FLOAT, gl.FALSE, s, o);
+    gl.enableVertexAttribArray(c);
+
+    // Create shader attribute: UV
+    const o2 = o * 2;
+    let u = gl.getAttribLocation(program, 'UV');
+    gl.vertexAttribPointer(u, 2, gl.FLOAT, gl.FALSE, s, o2);
+    gl.enableVertexAttribArray(u);
+
+    // Create normal attribute: n
+    const o3 = 8 * Float32Array.BYTES_PER_ELEMENT;
+    let n = gl.getAttribLocation(program, 'Normal');
+    gl.vertexAttribPointer(n, 3, gl.FLOAT, gl.FALSE, s, o3);
+    gl.enableVertexAttribArray(n);
+}
+
 function ValidateShaderProgram(p)
 {
     gl.validateProgram(p)
@@ -161,34 +256,6 @@ function AddVertex(x, y, z, r, g, b, u, v, nx, ny, nz)
     vertices[index + 10] = nz;
 }
 
-function CreateGeometryUI()
-{
-    const ew = document.getElementById('w');
-    const w = ew ? ew.value : 1.0;
-    const eh = document.getElementById('h');
-    const h = eh ? eh.value : 1.0;
-    const ed = document.getElementById('d');
-    const d = ed ? ed.value : 1.0;
-    const es = document.getElementById('s');
-    const s = es ? es.value : 1.0;
-
-    document.getElementById('ui').innerHTML =
-    'Width: <input type="number" id="w" value="' + w + '" onchange="InitShaders();"><br>' +
-    'Height: <input type="number" id="h" value="' + h + '" onchange="InitShaders();"><br>' +
-    'Depth: <input type="number" id="d" value="' + d + '" onchange="InitShaders();"><br>' +
-    'Subdivisions: <input type="number" id="s" value="' + s + '" onchange="InitShaders();">';
-
-    let e = document.getElementById('shape');
-    switch (e.selectedIndex)
-    {
-        case 0: CreateTrinangle(w, h); break;
-        case 1: CreateQuad(w, h); break;
-        case 2: CreateCube(w, h, d); break;
-        case 3: CreateCylinder(w, h, d, s); break;
-        case 4: CreateSubdividedCube(w, h, d, s); break;
-    }
-}
-
 function Perspective(fovy, aspect, near, far, matrix)
 {
     // Fill array with zeros
@@ -203,73 +270,6 @@ function Perspective(fovy, aspect, near, far, matrix)
     matrix[14] = -1;
     gl.uniformMatrix4fv(proGL, false, new Float32Array(projection));
     gl.uniformMatrix4fv(modGL, false, new Float32Array(modelView));
-}
-
-function CreateGeometryBuffers(program)
-{
-    // Generate selected geometry and UI
-    CreateGeometryUI();
-    // Create GPU buffer (VBO)
-    CreateVBO(program, new Float32Array(vertices));
-    angleGL = gl.getUniformLocation(program, 'Angle');
-    proGL = gl.getUniformLocation(program, 'Projection');
-    modGL = gl.getUniformLocation(program, 'ModelView');
-    CreateTexture(program, 'img/texture.jpg');
-    // Activate shader program
-    gl.useProgram(program);
-    // Update view rotation
-    gl.uniform4fv(angleGL, new Float32Array(angle));
-    // Update display options
-    gl.uniform4fv(displayGL, new Float32Array(display));
-    // Display geometry on screen
-    Render();
-} 
-
-function CreateVBO(program, vert)
-{
-    let vbo = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    gl.bufferData(gl.ARRAY_BUFFER, vert, gl.DYNAMIC_DRAW);
-
-    const s = 11 * Float32Array.BYTES_PER_ELEMENT;
-
-    // Create shader attribute: Pos
-    let p = gl.getAttribLocation(program, 'Pos');
-    gl.vertexAttribPointer(p, 3, gl.FLOAT, gl.FALSE, s, 0);
-    gl.enableVertexAttribArray(p);
-
-    // Create shader attribute: Color
-    const o = 3 * Float32Array.BYTES_PER_ELEMENT;
-    let c = gl.getAttribLocation(program, 'Color');
-    gl.vertexAttribPointer(c, 3, gl.FLOAT, gl.FALSE, s, o);
-    gl.enableVertexAttribArray(c);
-
-    // Create shader attribute: UV
-    const o2 = o * 2;
-    let u = gl.getAttribLocation(program, 'UV');
-    gl.vertexAttribPointer(u, 2, gl.FLOAT, gl.FALSE, s, o2);
-    gl.enableVertexAttribArray(u);
-
-    // Create normal attribute: n
-    const o3 = 8 * Float32Array.BYTES_PER_ELEMENT;
-    let n = gl.getAttribLocation(program, 'Normal');
-    gl.vertexAttribPointer(n, 3, gl.FLOAT, gl.FALSE, s, o3);
-    gl.enableVertexAttribArray(n);
-}
-
-function Render()
-{
-    gl.clearColor(0.0, 0.4, 0.6, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    // Dolly Zoom
-    const zoom = document.getElementById('zoom').value;
-    modelView[14] = -zoom;
-    // Perspective Projection
-    const fov = document.getElementById('fov').value;
-    const aspect = gl.canvas.width / gl.canvas.height;
-    Perspective(fov, aspect, 1.0, 2000.0, projection);
-    // Draw Geometry
-    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 11);
 }
 
 function CreateTexture(prog, url)
