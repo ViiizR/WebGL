@@ -189,6 +189,155 @@ function CreateGeometryUI()
     }
 }
 
+function Perspective(fovy, aspect, near, far, matrix)
+{
+    // Fill array with zeros
+    matrix.fill(0);
+    // Focal length
+    const f = Math.tan(fovy * Math.PI / 360.0);
+    // Setup matrix
+    matrix[0] = f / aspect;
+    matrix[5] = f;
+    matrix[10] = (far + near)     / (near - far);
+    matrix[11] = (2 * far * near) / (near - far);
+    matrix[14] = -1;
+    gl.uniformMatrix4fv(proGL, false, new Float32Array(projection));
+    gl.uniformMatrix4fv(modGL, false, new Float32Array(modelView));
+}
+
+function CreateGeometryBuffers(program)
+{
+    // Generate selected geometry and UI
+    CreateGeometryUI();
+    // Create GPU buffer (VBO)
+    CreateVBO(program, new Float32Array(vertices));
+    angleGL = gl.getUniformLocation(program, 'Angle');
+    proGL = gl.getUniformLocation(program, 'Projection');
+    modGL = gl.getUniformLocation(program, 'ModelView');
+    CreateTexture(program, 'img/texture.jpg');
+    // Activate shader program
+    gl.useProgram(program);
+    // Update view rotation
+    gl.uniform4fv(angleGL, new Float32Array(angle));
+    // Update display options
+    gl.uniform4fv(displayGL, new Float32Array(display));
+    // Display geometry on screen
+    Render();
+} 
+
+function CreateVBO(program, vert)
+{
+    let vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, vert, gl.DYNAMIC_DRAW);
+
+    const s = 11 * Float32Array.BYTES_PER_ELEMENT;
+
+    // Create shader attribute: Pos
+    let p = gl.getAttribLocation(program, 'Pos');
+    gl.vertexAttribPointer(p, 3, gl.FLOAT, gl.FALSE, s, 0);
+    gl.enableVertexAttribArray(p);
+
+    // Create shader attribute: Color
+    const o = 3 * Float32Array.BYTES_PER_ELEMENT;
+    let c = gl.getAttribLocation(program, 'Color');
+    gl.vertexAttribPointer(c, 3, gl.FLOAT, gl.FALSE, s, o);
+    gl.enableVertexAttribArray(c);
+
+    // Create shader attribute: UV
+    const o2 = o * 2;
+    let u = gl.getAttribLocation(program, 'UV');
+    gl.vertexAttribPointer(u, 2, gl.FLOAT, gl.FALSE, s, o2);
+    gl.enableVertexAttribArray(u);
+
+    // Create normal attribute: n
+    const o3 = 8 * Float32Array.BYTES_PER_ELEMENT;
+    let n = gl.getAttribLocation(program, 'Normal');
+    gl.vertexAttribPointer(n, 3, gl.FLOAT, gl.FALSE, s, o3);
+    gl.enableVertexAttribArray(n);
+}
+
+function Render()
+{
+    gl.clearColor(0.0, 0.4, 0.6, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // Dolly Zoom
+    const zoom = document.getElementById('zoom').value;
+    modelView[14] = -zoom;
+    // Perspective Projection
+    const fov = document.getElementById('fov').value;
+    const aspect = gl.canvas.width / gl.canvas.height;
+    Perspective(fov, aspect, 1.0, 2000.0, projection);
+    // Draw Geometry
+    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 11);
+}
+
+function CreateTexture(prog, url)
+{
+    // Load texture to graphics card
+    const texture = LoadTexture(url);
+    // Flip y axis so it fits OpenGL standard
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    // Activate texture to texture unit 0
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    // Add uniform location to fragment shader
+    textureGL = gl.getUniformLocation(prog, 'Texture');
+    // Add uniform location to fragment shader
+    displayGL = gl.getUniformLocation(prog, 'Display');
+}
+
+function LoadTexture(url)
+{
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    const pixel = new Uint8Array([0, 0, 255, 255]);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+    const image = new Image();
+    image.onload = () => 
+    {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        SetTextureFilters(image);
+    }
+    image.src = url;
+    return texture;
+}
+
+function IsPow2(value)
+{
+    return (value & (value - 1)) === 0;
+}
+
+function SetTextureFilters(image)
+{
+    if (IsPow2(image.width) && IsPow2(image.height))
+    {
+        gl.generateMipmap(gl.TEXTURE_2D);
+    }
+    else
+    {
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }
+}
+
+function Update()
+{
+    // Show texture (boolean) last element
+    const t = document.getElementById('t');
+    display[3] = t.checked ? 1.0 : 0.0;
+    // Light color (convert hex to RGB)
+    const l = document.getElementById('l').value;
+    display[0] = parseInt(l.substring(1,3),16) / 255.0;
+    display[1] = parseInt(l.substring(3,5),16) / 255.0;
+    display[2] = parseInt(l.substring(5,7),16) / 255.0;
+    // Update array to graphics card and render
+    gl.uniform4fv(displayGL, new Float32Array(display));
+    Render();
+}
+
 function AddTriangle(x1, y1, z1, r1, g1, b1, u1, v1, 
                      x2, y2, z2, r2, g2, b2, u2, v2,
                      x3, y3, z3, r3, g3, b3, u3, v3,
@@ -248,39 +397,39 @@ function CreateCube(width, height, depth)
 
     //FRONT
     AddQuad (-w,  h, d, 1.0, 0.0, 0.0, 0.0, 1.0, 
-              w,  h, d, 1.0, 0.0, 0.0, 0.0, 0.0, 
+              w,  h, d, 1.0, 0.0, 0.0, 1.0, 1.0, 
               w, -h, d, 1.0, 0.0, 0.0, 1.0, 0.0, 
-             -w, -h, d, 1.0, 0.0, 0.0, 1.0, 1.0, 
+             -w, -h, d, 1.0, 0.0, 0.0, 0.0, 0.0, 
              0.0, 0.0, 1.0);
     //BACK
-    AddQuad (-w,  h, -d, 1.0, 0.0, 0.0, 0.0, 1.0, 
-             -w, -h, -d, 0.0, 0.0, 0.0, 0.0, 0.0, 
-              w, -h, -d, 0.0, 0.0, 0.0, 1.0, 0.0, 
-              w,  h, -d, 1.0, 0.0, 0.0, 1.0, 1.0, 
+    AddQuad (-w,  h, -d, 1.0, 0.0, 0.0, 1.0, 1.0, 
+             -w, -h, -d, 0.0, 0.0, 0.0, 1.0, 0.0, 
+              w, -h, -d, 0.0, 0.0, 0.0, 0.0, 0.0, 
+              w,  h, -d, 1.0, 0.0, 0.0, 0.0, 1.0, 
               0.0, 0.0, 1.0,); 
     //TOP
     AddQuad (-w, h, -d, 0.0, 1.0, 0.0, 0.0, 1.0, 
-              w, h, -d, 0.0, 1.0, 0.0, 0.0, 0.0,
-              w, h,  d, 0.0, 1.0, 0.0, 1.0, 0.0, 
-             -w, h,  d, 0.0, 1.0, 0.0, 1.0, 1.0, 
+              w, h, -d, 0.0, 0.0, 0.0, 1.0, 1.0,
+              w, h,  d, 0.0, 0.0, 0.0, 1.0, 0.0, 
+             -w, h,  d, 0.0, 1.0, 0.0, 0.0, 0.0, 
              0.0, 0.0, 1.0,);
     //BOTTOM
     AddQuad (-w, -h,  d, 0.0, 1.0, 0.0, 0.0, 1.0, 
-              w, -h,  d, 0.0, 0.0, 0.0, 0.0, 0.0, 
+              w, -h,  d, 0.0, 0.0, 0.0, 1.0, 1.0, 
               w, -h, -d, 0.0, 0.0, 0.0, 1.0, 0.0, 
-             -w, -h, -d, 0.0, 1.0, 0.0, 1.0, 1.0, 
+             -w, -h, -d, 0.0, 1.0, 0.0, 0.0, 0.0, 
              0.0, 0.0, 1.0,);
     //LSIDE
-    AddQuad (-w,  h,  d, 0.0, 0.0, 1.0, 0.0, 1.0, 
-             -w, -h,  d, 0.0, 0.0, 1.0, 0.0, 0.0, 
-             -w, -h, -d, 0.0, 0.0, 1.0, 1.0, 0.0, 
-             -w,  h, -d, 0.0, 1.0, 1.0, 1.0, 1.0, 
+    AddQuad (-w,  h,  d, 0.0, 0.0, 1.0, 1.0, 1.0, 
+             -w, -h,  d, 0.0, 0.0, 1.0, 1.0, 0.0, 
+             -w, -h, -d, 0.0, 0.0, 1.0, 0.0, 0.0, 
+             -w,  h, -d, 0.0, 1.0, 1.0, 0.0, 1.0, 
              0.0, 0.0, 1.0,);
     //RSIDE
-    AddQuad (w, -h,  d, 0.0, 0.0, 1.0, 0.0, 1.0, 
-             w,  h,  d, 0.0, 0.0, 0.0, 0.0, 0.0, 
-             w,  h, -d, 0.0, 0.0, 0.0, 1.0, 0.0, 
-             w, -h, -d, 0.0, 0.0, 1.0, 1.0, 1.0, 
+    AddQuad (w, -h,  d, 0.0, 0.0, 1.0, 0.0, 0.0, 
+             w,  h,  d, 0.0, 0.0, 0.0, 0.0, 1.0, 
+             w,  h, -d, 0.0, 0.0, 0.0, 1.0, 1.0, 
+             w, -h, -d, 0.0, 0.0, 1.0, 1.0, 0.0, 
              0.0, 0.0, 1.0,);
 }
 
@@ -472,153 +621,4 @@ function CreateSubdividedCube(width, height, depth, subdivisions)
         }
     }
 
-}
-
-function Perspective(fovy, aspect, near, far, matrix)
-{
-    // Fill array with zeros
-    matrix.fill(0);
-    // Focal length
-    const f = Math.tan(fovy * Math.PI / 360.0);
-    // Setup matrix
-    matrix[0] = f / aspect;
-    matrix[5] = f;
-    matrix[10] = (far + near)     / (near - far);
-    matrix[11] = (2 * far * near) / (near - far);
-    matrix[14] = -1;
-    gl.uniformMatrix4fv(proGL, false, new Float32Array(projection));
-    gl.uniformMatrix4fv(modGL, false, new Float32Array(modelView));
-}
-
-function CreateGeometryBuffers(program)
-{
-    // Generate selected geometry and UI
-    CreateGeometryUI();
-    // Create GPU buffer (VBO)
-    CreateVBO(program, new Float32Array(vertices));
-    angleGL = gl.getUniformLocation(program, 'Angle');
-    proGL = gl.getUniformLocation(program, 'Projection');
-    modGL = gl.getUniformLocation(program, 'ModelView');
-    CreateTexture(program, 'img/texture.jpg');
-    // Activate shader program
-    gl.useProgram(program);
-    // Update view rotation
-    gl.uniform4fv(angleGL, new Float32Array(angle));
-    // Update display options
-    gl.uniform4fv(displayGL, new Float32Array(display));
-    // Display geometry on screen
-    Render();
-} 
-
-function CreateVBO(program, vert)
-{
-    let vbo = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    gl.bufferData(gl.ARRAY_BUFFER, vert, gl.DYNAMIC_DRAW);
-
-    const s = 11 * Float32Array.BYTES_PER_ELEMENT;
-
-    // Create shader attribute: Pos
-    let p = gl.getAttribLocation(program, 'Pos');
-    gl.vertexAttribPointer(p, 3, gl.FLOAT, gl.FALSE, s, 0);
-    gl.enableVertexAttribArray(p);
-
-    // Create shader attribute: Color
-    const o = 3 * Float32Array.BYTES_PER_ELEMENT;
-    let c = gl.getAttribLocation(program, 'Color');
-    gl.vertexAttribPointer(c, 3, gl.FLOAT, gl.FALSE, s, o);
-    gl.enableVertexAttribArray(c);
-
-    // Create shader attribute: UV
-    const o2 = o * 2;
-    let u = gl.getAttribLocation(program, 'UV');
-    gl.vertexAttribPointer(u, 2, gl.FLOAT, gl.FALSE, s, o2);
-    gl.enableVertexAttribArray(u);
-
-    // Create normal attribute: n
-    const o3 = 8 * Float32Array.BYTES_PER_ELEMENT;
-    let n = gl.getAttribLocation(program, 'Normal');
-    gl.vertexAttribPointer(n, 3, gl.FLOAT, gl.FALSE, s, o3);
-    gl.enableVertexAttribArray(n);
-}
-
-function Render()
-{
-    gl.clearColor(0.0, 0.4, 0.6, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    // Dolly Zoom
-    const zoom = document.getElementById('zoom').value;
-    modelView[14] = -zoom;
-    // Perspective Projection
-    const fov = document.getElementById('fov').value;
-    const aspect = gl.canvas.width / gl.canvas.height;
-    Perspective(fov, aspect, 1.0, 2000.0, projection);
-    // Draw Geometry
-    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 11);
-}
-
-function CreateTexture(prog, url)
-{
-    // Load texture to graphics card
-    const texture = LoadTexture(url);
-    // Flip y axis so it fits OpenGL standard
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    // Activate texture to texture unit 0
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    // Add uniform location to fragment shader
-    textureGL = gl.getUniformLocation(prog, 'Texture');
-    // Add uniform location to fragment shader
-    displayGL = gl.getUniformLocation(prog, 'Display');
-}
-
-function LoadTexture(url)
-{
-    const texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    const pixel = new Uint8Array([0, 0, 255, 255]);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-    const image = new Image();
-    image.onload = () => 
-    {
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-        SetTextureFilters(image);
-    }
-    image.src = url;
-    return texture;
-}
-
-function IsPow2(value)
-{
-    return (value & (value - 1)) === 0;
-}
-
-function SetTextureFilters(image)
-{
-    if (IsPow2(image.width) && IsPow2(image.height))
-    {
-        gl.generateMipmap(gl.TEXTURE_2D);
-    }
-    else
-    {
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    }
-}
-
-function Update()
-{
-    // Show texture (boolean) last element
-    const t = document.getElementById('t');
-    display[3] = t.checked ? 1.0 : 0.0;
-    // Light color (convert hex to RGB)
-    const l = document.getElementById('l').value;
-    display[0] = parseInt(l.substring(1,3),16) / 255.0;
-    display[1] = parseInt(l.substring(3,5),16) / 255.0;
-    display[2] = parseInt(l.substring(5,7),16) / 255.0;
-    // Update array to graphics card and render
-    gl.uniform4fv(displayGL, new Float32Array(display));
-    Render();
 }

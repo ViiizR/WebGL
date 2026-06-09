@@ -43,7 +43,7 @@
                              vec4(0.0, 1.0, 0.0, 0.0),
                              vec4(siY, 0.0, coY, 0.0),
                              vec4(0.0, 0.0, 0.0, 1.0));       
-            gl_Position = Projection * ModelView * matX * matY * v; //vec4(Pos, 1.0);
+            gl_Position = Projection * ModelView * matX * matY * vec4(Pos, 1.0); //v
             vertexColor = Color;
             uv = UV;
             normal = mat3(matX * matY) * Normal;
